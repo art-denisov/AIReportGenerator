@@ -3,6 +3,7 @@
 using System.ClientModel;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
+using ReportGeneratorCore;
 
 const string AZURE_OPENAI_DEPLOYMENT = "gpt-4.1";
 

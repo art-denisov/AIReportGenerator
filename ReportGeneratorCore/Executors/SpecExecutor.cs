@@ -2,48 +2,36 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using ReportGeneratorCore.DTOs;
 
-internal sealed partial class SpecExecutor : Executor
-{
-    private readonly IChatClient _chat;
+namespace ReportGeneratorCore.Executors;
 
-    public SpecExecutor(IChatClient chat)
-        : base("SpecAgent")
-    {
-        _chat = chat ?? throw new ArgumentNullException(nameof(chat));
-    }
+internal sealed partial class SpecExecutor(IChatClient chat) : Executor("SpecAgent") {
+    readonly IChatClient chat = chat ?? throw new ArgumentNullException(nameof(chat));
 
     [MessageHandler]
-    private async ValueTask<ReportSpec> HandleAsync(string requirements, IWorkflowContext context, CancellationToken ct)
-    {
+    async ValueTask<ReportSpec> HandleAsync(string requirements, IWorkflowContext context, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(requirements))
             throw new ArgumentException("Requirements must be non-empty.", nameof(requirements));
 
         var messages = BuildPrompt(requirements);
 
-        var options = new ChatOptions
-        {
-            Temperature = 0
-        };
+        var options = new ChatOptions { Temperature = 0 };
 
-        var response = await _chat
+        var response = await chat
             .GetResponseAsync(messages, options, ct)
             .ConfigureAwait(false);
 
         var json = ExtractJsonObject(response.Text);
 
         var spec = ParseSpec(json);
-
-        // Нормализация (защита от мусора).
+        
         spec = Normalize(spec);
 
         return spec;
     }
 
-    private static List<ChatMessage> BuildPrompt(string requirements)
-    {
-        // В проде рекомендую подмешивать схему/примеры и запрещать любое другое содержание.
-        // Здесь — минимально, но строго.
+    static List<ChatMessage> BuildPrompt(string requirements) {
         const string system =
             "You are a report specification generator.\n" +
             "Return STRICT JSON ONLY. No markdown, no code fences, no commentary.\n" +
@@ -53,42 +41,36 @@ internal sealed partial class SpecExecutor : Executor
             "- title: short human-readable title\n" +
             "- columns: 1..20 column captions (strings)\n";
 
-        return new List<ChatMessage>
-        {
-            new(ChatRole.System, system),
-            new(ChatRole.User, requirements),
-        };
+        return [ 
+            new ChatMessage(ChatRole.System, system),
+            new ChatMessage(ChatRole.User, requirements)
+        ];
     }
 
-    private static ReportSpec ParseSpec(string json)
-    {
-        try
-        {
+    static ReportSpec ParseSpec(string json) {
+        try {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
             var title = root.TryGetProperty("title", out var t) ? t.GetString() : null;
             var cols = root.TryGetProperty("columns", out var c) && c.ValueKind == JsonValueKind.Array
                 ? c.EnumerateArray().Select(x => x.GetString()).ToArray()
-                : Array.Empty<string?>();
+                : [];
 
             return new ReportSpec(title ?? "Report", cols.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!).ToArray());
         }
-        catch (JsonException je)
-        {
-            // В проде полезно логировать сырой ответ LLM.
+        catch (JsonException je) {
             throw new InvalidOperationException("LLM returned invalid JSON for ReportSpec.", je);
         }
     }
 
-    private static ReportSpec Normalize(ReportSpec spec)
-    {
-        var title = (spec.Title ?? "").Trim();
+    static ReportSpec Normalize(ReportSpec spec) {
+        var title = spec.Title.Trim();
         if (title.Length == 0) title = "Report";
         if (title.Length > 120) title = title[..120].Trim();
 
-        var columns = (spec.Columns ?? Array.Empty<string>())
-            .Select(c => (c ?? "").Trim())
+        var columns = spec.Columns
+            .Select(c => c.Trim())
             .Where(c => c.Length > 0)
             .Select(c => c.Length > 60 ? c[..60].Trim() : c)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -96,51 +78,49 @@ internal sealed partial class SpecExecutor : Executor
             .ToArray();
 
         if (columns.Length == 0)
-            columns = new[] { "Name", "Value" };
+            columns = ["Name", "Value"];
 
         return new ReportSpec(title, columns);
     }
-
-    /// <summary>
-    /// Вытаскивает первый JSON-объект из текста. Устойчиво к "Here is JSON: {...}" и т.п.
-    /// </summary>
-    private static string ExtractJsonObject(string? text)
-    {
+    
+    static string ExtractJsonObject(string? text) {
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("LLM returned empty response.");
 
         var s = text.Trim();
-
-        // Быстрый путь: уже JSON-объект
-        if (s.StartsWith("{", StringComparison.Ordinal))
+        
+        if (s.StartsWith('{'))
             return s;
-
-        // Медленный путь: ищем первую сбалансированную пару { ... }
+        
         var sb = new StringBuilder();
         var depth = 0;
         var started = false;
 
-        foreach (var ch in s)
-        {
-            if (!started)
-            {
-                if (ch == '{')
-                {
+        foreach (var ch in s) {
+            if (!started) {
+                if (ch == '{') {
                     started = true;
                     depth = 1;
                     sb.Append(ch);
                 }
+
                 continue;
             }
 
             sb.Append(ch);
 
-            if (ch == '{') depth++;
-            else if (ch == '}')
-            {
-                depth--;
-                if (depth == 0)
-                    return sb.ToString();
+            switch (ch) {
+                case '{':
+                    depth++;
+                    break;
+
+                case '}': {
+                    depth--;
+                    if (depth == 0)
+                        return sb.ToString();
+
+                    break;
+                }
             }
         }
 
