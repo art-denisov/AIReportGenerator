@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ReportGeneratorConsole/ReportGeneratorConsole.csproj" />
+  <Project Path="ReportGeneratorCore/ReportGeneratorCore.csproj" />
+</Solution>
