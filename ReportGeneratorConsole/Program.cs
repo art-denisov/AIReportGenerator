@@ -26,7 +26,7 @@ var gen = new ReportGenerator(chatClient);
 using var cts = new CancellationTokenSource();
 
 var result = await gen.GenerateAsync(
-    "Sales report. Columns: Date, Customer, Amount.",
+    "I need a standard invoice for a client. At the top — the company logo, a large “Invoice” title, invoice number, issue date, and due date. On the left — client information (bill to), on the right — shipping address if different. The main section should contain a table of line items: description of product or service, quantity, unit price, and line total. At the bottom, show subtotal, tax, shipping if applicable, and prominently highlight the total amount due. At the end, add payment terms and a short message such as “Thank you for your business.” Style — professional and clean.",
     onEvent: evt => Console.WriteLine(evt.ToString()),
     ct: cts.Token);
 

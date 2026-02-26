@@ -22,23 +22,23 @@ public sealed class ReportGenerator {
             .Build();
     }
 
-    async IAsyncEnumerable<WorkflowEvent> RunStreamingAsync( string requirements, [EnumeratorCancellation] CancellationToken ct = default) {
-        if (string.IsNullOrWhiteSpace(requirements))
-            throw new ArgumentException("Requirements must be non-empty.", nameof(requirements));
+    async IAsyncEnumerable<WorkflowEvent> RunStreamingAsync( string userPrompt, [EnumeratorCancellation] CancellationToken ct = default) {
+        if (string.IsNullOrWhiteSpace(userPrompt))
+            throw new ArgumentException("Requirements must be non-empty.", nameof(userPrompt));
 
         await using var run = await InProcessExecution
-            .RunStreamingAsync(workflow, requirements, cancellationToken: ct)
+            .RunStreamingAsync(workflow, userPrompt, cancellationToken: ct)
             .ConfigureAwait(false);
 
         await foreach (var evt in run.WatchStreamAsync(ct).ConfigureAwait(false))
             yield return evt;
     }
 
-    public async Task<ValidatedSpec> GenerateAsync(string requirements, Action<WorkflowEvent>? onEvent = null, CancellationToken ct = default) {
+    public async Task<ValidatedSpec> GenerateAsync(string userPrompt, Action<WorkflowEvent>? onEvent = null, CancellationToken ct = default) {
         ValidatedSpec? output = null;
         Exception? error = null;
 
-        await foreach (var evt in RunStreamingAsync(requirements, ct).ConfigureAwait(false)) {
+        await foreach (var evt in RunStreamingAsync(userPrompt, ct).ConfigureAwait(false)) {
             onEvent?.Invoke(evt);
 
             switch (evt) {

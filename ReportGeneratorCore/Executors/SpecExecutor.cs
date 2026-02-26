@@ -1,20 +1,25 @@
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using ReportGeneratorCore.DTOs;
+using ReportGeneratorCore.Prompts;
 
 namespace ReportGeneratorCore.Executors;
 
 internal sealed partial class SpecExecutor(IChatClient chat) : Executor("SpecAgent") {
     readonly IChatClient chat = chat ?? throw new ArgumentNullException(nameof(chat));
+    
+    const string resourceNamespace = "ReportGeneratorCore.Prompts";
+    static readonly Assembly assembly = typeof(ReportGenerator).Assembly;
 
     [MessageHandler]
     async ValueTask<ReportSpec> HandleAsync(string requirements, IWorkflowContext context, CancellationToken ct) {
         if (string.IsNullOrWhiteSpace(requirements))
             throw new ArgumentException("Requirements must be non-empty.", nameof(requirements));
 
-        var messages = BuildPrompt(requirements);
+        var messages = BuildPrompt(requirements, PromptFileNames.NER_Prompt);
 
         var options = new ChatOptions { Temperature = 0 };
 
@@ -25,62 +30,40 @@ internal sealed partial class SpecExecutor(IChatClient chat) : Executor("SpecAge
         var json = ExtractJsonObject(response.Text);
 
         var spec = ParseSpec(json);
-        
-        spec = Normalize(spec);
-
         return spec;
     }
 
-    static List<ChatMessage> BuildPrompt(string requirements) {
-        const string system =
-            "You are a report specification generator.\n" +
-            "Return STRICT JSON ONLY. No markdown, no code fences, no commentary.\n" +
-            "Schema:\n" +
-            "{ \"title\": string, \"columns\": string[] }\n" +
-            "Rules:\n" +
-            "- title: short human-readable title\n" +
-            "- columns: 1..20 column captions (strings)\n";
+    static List<ChatMessage> BuildPrompt(string userPrompt, string systemPromptFile) {
+        if(string.IsNullOrWhiteSpace(systemPromptFile))
+            throw new ArgumentException("Prompt file name cannot be null or empty.", nameof(systemPromptFile));
 
+        var resourceName = $"{resourceNamespace}.{systemPromptFile}";
+
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if(stream == null)
+            throw new FileNotFoundException($"Embedded resource not found: {resourceName}", resourceName);
+        
+        using var reader = new StreamReader(stream);
+        var systemPrompt = reader.ReadToEnd();
+        
         return [ 
-            new ChatMessage(ChatRole.System, system),
-            new ChatMessage(ChatRole.User, requirements)
+            new ChatMessage(ChatRole.System, systemPrompt),
+            new ChatMessage(ChatRole.User, userPrompt)
         ];
     }
 
     static ReportSpec ParseSpec(string json) {
         try {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            var title = root.TryGetProperty("title", out var t) ? t.GetString() : null;
-            var cols = root.TryGetProperty("columns", out var c) && c.ValueKind == JsonValueKind.Array
-                ? c.EnumerateArray().Select(x => x.GetString()).ToArray()
-                : [];
-
-            return new ReportSpec(title ?? "Report", cols.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!).ToArray());
+            var options = new JsonSerializerOptions {
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = true
+            };
+            
+            return JsonSerializer.Deserialize<ReportSpec>(json, options) ?? new ReportSpec();
         }
         catch (JsonException je) {
             throw new InvalidOperationException("LLM returned invalid JSON for ReportSpec.", je);
         }
-    }
-
-    static ReportSpec Normalize(ReportSpec spec) {
-        var title = spec.Title.Trim();
-        if (title.Length == 0) title = "Report";
-        if (title.Length > 120) title = title[..120].Trim();
-
-        var columns = spec.Columns
-            .Select(c => c.Trim())
-            .Where(c => c.Length > 0)
-            .Select(c => c.Length > 60 ? c[..60].Trim() : c)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(20)
-            .ToArray();
-
-        if (columns.Length == 0)
-            columns = ["Name", "Value"];
-
-        return new ReportSpec(title, columns);
     }
     
     static string ExtractJsonObject(string? text) {
