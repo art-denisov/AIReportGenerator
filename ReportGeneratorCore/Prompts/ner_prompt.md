@@ -109,6 +109,4 @@ OUTPUT REQUIREMENTS:
 
 Now extract the report spec from this user text:
 
-<<<
 {USER_TEXT}
->>>
