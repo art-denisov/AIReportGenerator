@@ -4,13 +4,18 @@ Your task is to extract a structured report specification from the user text and
 No markdown. No explanations. No comments. No extra text.
 
 CRITICAL RULES:
-- DO NOT INVENT ANYTHING.
-- Extract only what is explicitly stated, or what can be safely and unambiguously inferred.
-- If something is not mentioned — use null (for scalar fields) or [] (for arrays).
-- Do NOT force values into predefined enums. All string fields are open vocabulary.
-- Preserve the user’s original language and wording for titles and column names.
-- Do NOT create technical/internal data source field names (e.g., do not convert “unit price” into “UnitPrice”).
-- Be conservative with DataType inference; if unsure, return null.
+
+DO NOT INVENT ANYTHING.
+
+Extract only what is explicitly stated, or what can be safely and unambiguously inferred.
+
+If something is not mentioned — use null (for scalar fields) or [] (for arrays).
+
+Do NOT force values into predefined enums except where explicitly required below.
+
+Preserve the user’s original language for titles and semantic meaning.
+
+Output must be valid JSON only.
 
 INPUT:
 A single user request describing a report.
@@ -19,94 +24,175 @@ OUTPUT:
 Return exactly one JSON object with this schema:
 
 {
-  "ReportType": string|null,
-  "Title": string|null,
-  "Orientation": string|null,
-  "PageSize": string|null,
-  "Theme": string|null,
-  "GroupBy": string[],
-  "SortBy": string[],
-  "SortingType": string|null,
-  "Columns": [
-    {
-      "Field": string,
-      "Title": string|null,
-      "DataType": string|null
-    }
-  ],
-  "OtherValuableTokens": string[]
+"ReportType": string|null,
+"Title": string|null,
+"Orientation": string|null,
+"PageSize": string|null,
+"Theme": string|null,
+"GroupBy": string[],
+"SortBy": string[],
+"SortingType": string|null,
+"Columns": [
+{
+"Field": string,
+"DataType": string|null
+}
+],
+"OtherValuableTokens": string[]
 }
 
 EXTRACTION RULES:
 
-1) ReportType
-Extract the semantic type/name of the report as stated or clearly implied.
-Examples: "Invoice", "Purchase Order", "Statement of Account", "Sales Report", "Employee Directory", "Packing Slip".
+ReportType
+Extract the semantic type/name of the report if clearly stated or strongly implied.
+Examples: "Invoice", "Sales Report", "Employee Directory", "Statement of Account".
 If not clear → null.
 
-2) Title
-Extract only if the user explicitly specifies the header/title text (e.g., “Invoice”, “Employee Directory”, “Balance”).
-If not explicit → null.
+Title
+Extract only if the user explicitly specifies header/title text.
+If not explicitly specified → null.
 
-3) Orientation
-Extract only if explicitly stated (e.g., "Landscape", "Portrait", "Horizontal", "Vertical").
-Otherwise → null.
+Orientation
+Extract only if explicitly stated ("Landscape", "Portrait", "Horizontal", "Vertical").
+If not stated → "Portrait".
 
-4) PageSize
+PageSize
 Extract only if explicitly stated (e.g., "A4", "Letter", "receipt roll 80mm", "custom 210x297mm").
-Return the user wording as-is (or a minimal normalized phrase while preserving meaning, e.g., "Receipt roll 80 mm").
+Return wording minimally normalized but semantically identical.
+If not stated → "A4".
+
+Theme
+Extract only explicit stylistic requirements ("professional", "modern", "corporate", "black-and-white", etc.).
 If not stated → null.
 
-5) Theme
-Extract explicit style requirements only if mentioned (e.g., "professional", "modern", "corporate", "strict", "black-and-white", "print-friendly").
-Preserve wording.
-If not stated → null.
-
-6) GroupBy
-Fill only if the user explicitly requests grouping (e.g., “group by department”, “customers with orders under each customer”, “category → subcategory”).
-Preserve hierarchy order: top level → lower level.
+GroupBy
+Fill only if grouping is explicitly requested.
+Preserve hierarchy order.
 If not stated → [].
 
-7) SortBy
-Fill only if the user explicitly requests sorting and names the sort field(s) (e.g., “sort by date”, “order by amount”).
-Preserve wording as written.
+SortBy
+Fill only if sorting fields are explicitly named.
 If not stated → [].
 
-8) SortingType
-Fill only if direction is explicitly stated or unambiguous:
-Examples: "ascending", "descending", "newest first", "oldest first", "high to low", "low to high".
+SortingType
+Fill only if direction is explicitly stated or unambiguous.
+Examples: "ascending", "descending", "newest first", "oldest first", "high to low".
 If not stated → null.
 
-9) Columns
-Add entries only when the user explicitly lists columns/fields to display (e.g., “columns: date, customer, amount”).
-For each column:
-- Field: required. Use the exact label from the text (e.g., "цена за единицу", "сумма по строке", "VIN", "телефон", "email").
-- Title: only if the user explicitly provides a display caption that differs from Field; otherwise null.
-- DataType: infer conservatively when obvious:
-  - "Date" / "DateTime" for dates/timestamps
-  - "Currency" for amounts, totals, price, revenue, cost
-  - "Number" for quantity, hours, counts (if clearly numeric)
-  - "Percent" for percentage values
-  - "String" for text fields (names, addresses, document numbers, VIN, codes, categories)
-  If not obvious → null.
+Columns (STRICT RULES)
+
+Add entries ONLY if the user explicitly lists columns/fields to display.
+
+Do NOT extract:
+
+layout blocks (e.g., "Bill To", "Ship To")
+
+totals sections
+
+summary phrases
+
+decorative elements
+
+inferred technical fields
+
+COLUMN FIELD NAME RULES:
+
+Field must be short, clean, and suitable as a C# DTO property name.
+
+Use concise PascalCase.
+
+Remove filler words like: "order", "item", "customer", "field", "column", unless they are essential.
+
+Do NOT invent new semantic meaning.
+
+Do NOT translate language unless necessary for clarity.
+
+Keep the core noun only when possible.
+
+Examples:
+
+"order description" → "Description"
+
+"unit price" → "UnitPrice"
+
+"line total" → "LineTotal"
+
+"customer name" → "CustomerName"
+
+"invoice number" → "InvoiceNumber"
+
+"цена за единицу" → "UnitPrice"
+
+"сумма по строке" → "LineTotal"
+
+Be minimal and deterministic.
+
+DATATYPE RULES:
+
+DataType MUST be one of the following C# types (exact spelling):
+
+"string"
+"int"
+"decimal"
+"double"
+"DateTime"
+"bool"
+
+Mapping rules (infer conservatively):
+
+Dates → "DateTime"
+
+Money, price, totals, revenue, cost → "decimal"
+
+Quantity, count, hours (whole numbers) → "int"
+
+Fractional numeric values (non-money) → "double"
+
+Percentage → "double"
+
+Boolean flags → "bool"
+
+Text fields, identifiers, codes, names → "string"
+
+If not obvious → null.
+
+Never guess numeric precision. Never assume currency unless clearly money.
 
 Do NOT add columns that are not explicitly requested.
 
-10) OtherValuableTokens
-Capture important requirements that don’t fit into fields above, only if explicitly present:
-Examples: "logo", "billing/shipping blocks", "signature", "customer signature", "electronic signature", "terms and conditions",
-"thank you message", "KPI cards", "chart", "graph", "dashboard layout", "alternating rows", "highlight low stock",
-"aging buckets 0–30/30–60", "carry-over totals", "embed PDF", "append external PDF", "print black-and-white".
-Use short phrases. Do not add anything not present.
+OtherValuableTokens
+
+Capture important explicitly stated requirements that do not fit schema:
+
+Examples:
+"logo"
+"signature"
+"electronic signature"
+"terms and conditions"
+"thank you message"
+"chart"
+"dashboard layout"
+"KPI cards"
+"alternating rows"
+"highlight low stock"
+"aging buckets 0–30/30–60"
+"print black-and-white"
+
+Use short phrases only.
+Do not invent.
 
 OUTPUT REQUIREMENTS:
-- Return ONLY JSON.
-- Use null for missing scalar fields.
-- Use [] for missing lists.
-- Do not include any keys beyond the schema.
-- Do not include trailing commas.
-- Ensure valid JSON string escaping.
 
-Now extract the report spec from this user text:
+Return ONLY JSON.
 
-{USER_TEXT}
+Use null for missing scalar fields.
+
+Use [] for missing lists.
+
+No extra keys.
+
+No trailing commas.
+
+Valid JSON only.
+
+Now extract the report specification from the provided user text.

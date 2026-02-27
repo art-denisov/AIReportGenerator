@@ -38,9 +38,6 @@ public sealed class ReportColumnDto {
     [JsonPropertyName("Field")]
     public string Field { get; set; } = string.Empty;
 
-    [JsonPropertyName("Title")]
-    public string? Title { get; set; }
-
     [JsonPropertyName("DataType")]
     public string? DataType { get; set; }
 }
