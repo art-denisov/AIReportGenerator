@@ -26,7 +26,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="EvaluationTests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <EmbeddedResource Include="Prompts\ner_prompt.md" />
+        <EmbeddedResource Include="Prompts\ner_pasha.md" />
     </ItemGroup>
     
     
