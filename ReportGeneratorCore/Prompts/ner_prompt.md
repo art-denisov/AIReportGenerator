@@ -54,12 +54,12 @@ If not explicitly specified → null.
 
 Orientation
 Extract only if explicitly stated ("Landscape", "Portrait", "Horizontal", "Vertical").
-If not stated → "Portrait".
+If not clear → null.
 
 PageSize
 Extract only if explicitly stated (e.g., "A4", "Letter", "receipt roll 80mm", "custom 210x297mm").
 Return wording minimally normalized but semantically identical.
-If not stated → "A4".
+If not clear → null.
 
 Theme
 Extract only explicit stylistic requirements ("professional", "modern", "corporate", "black-and-white", etc.).
