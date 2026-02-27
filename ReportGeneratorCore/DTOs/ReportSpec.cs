@@ -32,6 +32,9 @@ public sealed class ReportSpec {
 
     [JsonPropertyName("OtherValuableTokens")]
     public List<string> OtherValuableTokens { get; set; } = [];
+    
+    [JsonPropertyName("NERSuggestions")]
+    public List<string> NERSuggestions { get; set; } = [];
 }
 
 public sealed class ReportColumnDto {

@@ -39,6 +39,7 @@ Return exactly one JSON object with this schema:
 }
 ],
 "OtherValuableTokens": string[]
+"NERSuggestions": string[]
 }
 
 EXTRACTION RULES:
@@ -156,23 +157,226 @@ Never guess numeric precision. Never assume currency unless clearly money.
 
 Do NOT add columns that are not explicitly requested.
 
-OtherValuableTokens
+OtherValuableTokens (EXPANDED SEMANTIC CONTEXT)
 
-Capture important explicitly stated requirements that do not fit schema:
+Purpose:
+Capture any explicitly stated information from the user request that is useful for report generation but does NOT belong to structured schema fields (ReportType, Columns, GroupBy, etc.).
 
-Examples:
-"logo"
-"signature"
-"electronic signature"
-"terms and conditions"
-"thank you message"
-"chart"
+This section is NOT limited to layout decorations.
+It must capture ANY additional semantic constraints, visual requirements, behavioral instructions, or domain hints that may influence layout, formatting, styling, calculations, rendering logic, or export behavior.
+
+Include only information explicitly mentioned by the user.
+
+DO NOT invent.
+
+Use short, structured phrases. Avoid long sentences.
+
+Possible categories (examples, not exhaustive):
+
+Layout & Visual Structure:
+
+"logo in header"
+
+"two-column header layout"
+
+"billing and shipping blocks"
+
+"table with borders"
+
+"alternating row colors"
+
+"large total highlighted"
+
+"compact layout"
+
+"multi-page report"
+
 "dashboard layout"
-"KPI cards"
-"alternating rows"
-"highlight low stock"
+
+"cards at top"
+
+"chart below table"
+
+"summary section at bottom"
+
+Branding & Styling:
+
+"professional style"
+
+"corporate style"
+
+"modern design"
+
+"strict black-and-white"
+
+"print-friendly"
+
+"minimalistic"
+
+"use company colors"
+
+Business Logic & Calculations:
+
+"show subtotal"
+
+"calculate tax"
+
+"show grand total"
+
 "aging buckets 0–30/30–60"
-"print black-and-white"
+
+"running totals"
+
+"carry-over totals"
+
+"percentage of total"
+
+"group totals"
+
+Behavior & Emphasis:
+
+"highlight overdue invoices"
+
+"highlight low stock"
+
+"show only active customers"
+
+"top 10 items"
+
+"filter last 30 days"
+
+Export & Output Requirements:
+
+"optimized for printing"
+
+"export to PDF"
+
+"append external PDF"
+
+"fit to one page width"
+
+"receipt format"
+
+Content Blocks:
+
+"terms and conditions"
+
+"thank you message"
+
+"signature"
+
+"customer signature"
+
+"electronic signature"
+
+"notes section"
+
+"comments field"
+
+Language & Localization:
+
+"English language"
+
+"Russian language"
+
+"bilingual"
+
+Domain Context:
+
+"automotive service"
+
+"retail store"
+
+"manufacturing"
+
+"internal report"
+
+Rules:
+
+Extract only if explicitly stated.
+
+Use short phrases.
+
+No duplicates.
+
+No explanations.
+
+Do not restate structured fields (e.g., do not repeat Columns or GroupBy here).
+
+If nothing applicable → [].
+
+NERSuggestions (INTELLIGENT DESIGN HINTS)
+
+Purpose:
+Provide optional design or structural hints inferred from the user request that may improve downstream report generation quality.
+
+This section may include safe, reasonable inferences that are not explicitly stated but are strongly implied by context.
+
+Unlike OtherValuableTokens, this section MAY include conservative, logical suggestions — but must NOT introduce new business data fields or invent content.
+
+Allowed content:
+
+Layout Optimization Suggestions:
+
+"use grouped layout structure"
+
+"use master-detail layout"
+
+"use summary band"
+
+"use page footer for totals"
+
+"use table-based layout"
+
+"consider landscape for many columns"
+
+"use compact font size"
+
+Formatting Suggestions:
+
+"format currency with 2 decimals"
+
+"format dates in short format"
+
+"right-align numeric columns"
+
+"bold totals"
+
+"use column auto-width"
+
+Data Presentation Suggestions:
+
+"add group subtotals"
+
+"add overall summary"
+
+"use sorting inside groups"
+
+"use conditional formatting"
+
+UX/Readability Improvements:
+
+"ensure printable margins"
+
+"avoid column overflow"
+
+"use alternating rows for readability"
+
+CRITICAL RULES:
+
+Suggestions must be generic structural/layout hints.
+
+Do NOT invent new columns.
+
+Do NOT invent business rules.
+
+Do NOT contradict explicit user instructions.
+
+Do NOT repeat values already present in structured fields.
+
+Keep phrases short.
+
+If no reasonable suggestion → [].
 
 Use short phrases only.
 Do not invent.
