@@ -121,10 +121,6 @@ Examples:
 
 "invoice number" → "InvoiceNumber"
 
-"цена за единицу" → "UnitPrice"
-
-"сумма по строке" → "LineTotal"
-
 Be minimal and deterministic.
 
 DATATYPE RULES:
